@@ -14,9 +14,9 @@
         {
             "type": "node",
             "request": "attach",
-            "name": "Attach to Process",
-            "port": 7000, //5858,
-            "restart": true
+            "name": "Attach",
+            "restart": true,
+            "protocol": "inspector"
         }
     ]
 }
