@@ -1,3 +1,4 @@
+const colors = require('colors')
 const VortexClient = require('./vortex')
 
 const VORTEX_CONFIG = {
@@ -11,7 +12,13 @@ const VORTEX_CONFIG = {
  * setup vortext client
  */
 const client = new VortexClient(VORTEX_CONFIG)
+const { host, port, username, password } = VORTEX_CONFIG
 client.connect()
+    .then(message => console.log(colors.green(message)))
+    .then(() => client.login(username, password))
+    .then(message => {
+        console.log(colors.green(message))
+    })
 
 /**
  * console input setup
@@ -19,7 +26,7 @@ client.connect()
 const stdin = process.openStdin()
 stdin.addListener('data', input => {
     const cmd = input.toString().trim()
-    client.send(cmd)
+    client.send(cmd).then(console.log)
 })
 
 /**
