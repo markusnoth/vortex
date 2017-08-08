@@ -2,9 +2,10 @@ const net = require('net')
 
 module.exports = vortexClient
 
+const ROW_LENGTH = 40
+
 const RESPONSE_TYPES = {
     COMMAND_RESPONSE: 1,
-    PAGE_REQUEST: 2,
     PAGE_WITH_COMMAND_ROW: 3
 }
 
@@ -76,26 +77,34 @@ vortexClient.prototype = {
         })
     },
     onData(data) {
+        data = Array.from(data)
+        if (this.data) {
+            data = this.data.concat(data)
+        }
         const responseComplete = data[data.length - 2] === 0xF8 && data[data.length - 1] === 1
-        data = this.data ? this.data.concat(data) : Array.from(data)
         if (responseComplete) {
+            data.splice(-2)
             const type = data.shift()
             switch (type) {
                 case RESPONSE_TYPES.COMMAND_RESPONSE: {
-                    data = data.slice(data.findIndex(i => i !== 32), 81)
-                    const status = data.filter(i => i === 0x03 || i === 0x06 || i === 0x07)[0]
-                    let command = String.fromCharCode.apply(String, data.filter(i => i >= 0x20)).trim()
+                    const [status, ...command] = data.slice(data.findIndex(i => i !== 32), 81)
+                    const commandText = String.fromCharCode.apply(String, command.filter(i => i >= 0x20)).trim()
                     if (status === RESPONSE_STATUS_CODES.ERROR) {
-                        throw new Error(command)
+                        throw new Error(commandText)
                     }
-                    return this.end(command)
+                    return this.end(commandText)
                 }
                 case RESPONSE_TYPES.PAGE_WITH_COMMAND_ROW: {
-                    return this.end(String.fromCharCode.apply(String, data))
+                    const page = new Array(ROW_LENGTH * 24)
+                    for (let row = data.shift(); row !== 255; row = data.shift()) {
+                        page.splice(row * ROW_LENGTH, ROW_LENGTH, ...data.splice(0, ROW_LENGTH))
+                    }
+                    const command = data.slice(data.findIndex(i => i !== 32), 81)
+                    return this.end(page)
                 }
             }
         } else {
-            this.data = [...data]
+            this.data = data
         }
     },
     disconnect() {
