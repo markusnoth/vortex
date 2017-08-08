@@ -12,6 +12,14 @@ client.connect()
 
 const app = express()
 
+// SETUP URL-REWRITING FOR IISNODE
+if (process.env.VIRTUAL_DIR_PATH) {
+    app.use((req, res, next) => {
+        req.url = req.url.replace(new RegExp('^' + process.env.VIRTUAL_DIR_PATH), '')
+        next()
+    })
+}
+
 app.get('/page/:mag/:set?/:page?', (req, res, next) => {
     const { mag, set, page } = req.params
     client.getPage(mag, set, page)
