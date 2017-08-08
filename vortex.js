@@ -110,6 +110,17 @@ vortexClient.prototype = {
             this.data = data
         }
     },
+    getPage(mag, set, page) {
+        let command = new String(mag)
+        if (set || page) command += ' ' + set
+        if (page) command += '.' + page
+        return this.send(command).then(response => {
+            if(Array.isArray(response) && response.length === 960){
+                return response
+            }
+            throw new Error(`Invalid response: ${response}`)
+        })
+    },
     disconnect() {
         try {
             this.client.end()

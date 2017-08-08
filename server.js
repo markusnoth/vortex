@@ -12,9 +12,13 @@ client.connect()
 
 const app = express()
 
-app.get('/:mag/:set?/:page?', (req, res, next) => {
-    client.send(`${req.params.mag}`)
-        .then(response => res.send(response))
+app.get('/page/:mag/:set?/:page?', (req, res, next) => {
+    const { mag, set, page } = req.params
+    client.getPage(mag, set, page)
+        .then(response => {
+            res.setHeader('Content-Type', 'application/ep1')
+            res.send(Buffer.from(response))
+        })
         .catch(error => res.status(500).send(error.message || error))
 })
 
