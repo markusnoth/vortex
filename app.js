@@ -28,8 +28,11 @@ stdin.addListener('data', input => {
     const cmd = input.toString().trim()
     client.send(cmd).then(response => {
         if (Array.isArray(response) && response.length === 960) {
-            while(response.length > 0) {
-                console.log(String.fromCharCode.apply(String, response.splice(0, 40).map(i => i >= 0x20 ? i : 0x20)))
+            while (response.length > 0) {
+                let row = response.splice(0, 40).map(i => i >= 0x20 ? i : 0x20)
+                row = String.fromCharCode.apply(String, row)
+                row = colors.bgBlack(colors.white(row))
+                console.log(row)
             }
         } else {
             console.log(response)
