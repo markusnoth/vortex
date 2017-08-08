@@ -116,6 +116,8 @@ vortexClient.prototype = {
         if (page) command += '.' + page
         return this.send(command).then(response => {
             if(Array.isArray(response) && response.length === 960){
+                response.splice(0, 0, 0xFE, 0x01, 0x1A, 0x00, 0x00, 0x00)
+                response.push(...new Array(42))
                 return response
             }
             throw new Error(`Invalid response: ${response}`)

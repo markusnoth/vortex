@@ -16,10 +16,11 @@ client.connect().then(message => console.log(colors.green(message)))
 const stdin = process.openStdin()
 stdin.addListener('data', input => {
     const cmd = input.toString().trim()
-    client.send(cmd).then(response => {
-        if (Array.isArray(response) && response.length === 960) {
-            while (response.length > 0) {
-                let row = response.splice(0, 40).map(i => i >= 0x20 ? i : 0x20)
+    client.getPage(cmd).then(response => {
+        if (Array.isArray(response) && response.length === 1008) {
+            const rows = response.slice(6, 966)
+            while (rows.length > 0) {
+                let row = rows.splice(0, 40).map(i => i >= 0x20 ? i : 0x20)
                 row = String.fromCharCode.apply(String, row)
                 row = colors.bgBlack(colors.white(row + ' '))
                 console.log(row)
