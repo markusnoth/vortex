@@ -7,10 +7,17 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Launch Program",
+            "name": "Command line",
             "program": "${workspaceRoot}\\app.js",
             "cwd": "${workspaceRoot}",
             "console": "integratedTerminal"
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Server",
+            "program": "${workspaceRoot}\\server.js",
+            "cwd": "${workspaceRoot}"
         },
         {
             "type": "node",

@@ -17,7 +17,8 @@ const RESPONSE_STATUS_CODES = {
 
 const CONFIG_DEFAULTS = {
     port: 1025,
-    timeout: 5000
+    timeout: 5000,
+    autoConnect: true
 }
 
 function vortexClient(config) {
@@ -53,15 +54,17 @@ vortexClient.prototype = {
         delete this.data
     },
     connect() {
-        return this.start(() => {
-            const { host, port } = this.config
-            this.client.connect(port, host, () => this.onConnected())
-        })
-    },
-    onConnected() {
-        const { host, port, username, password } = this.config
+        const { host, port, username, password, autoConnect } = this.config
+        return this.start(() => this.client.connect(port, host))
+            .then(() => {
+                if (username && password && autoConnect) {
+                    return this.login(username, password)
+                }
+            })
     },
     login(username, password) {
+        if (!username) throw new Error('Username is required')
+        if (!password) throw new Error('Password is required')
         return this.send(`log ${username}`).then(response => this.send(password))
     },
     send(cmd) {
