@@ -24,8 +24,16 @@ const REQUEST_TYPES = {
 
 const CONFIG_DEFAULTS = {
     port: 1025,
-    timeout: 5000,
-    autoConnect: true
+    timeout: 5000
+}
+
+function send(client, data, type = REQUEST_TYPES.COMMAND_LINE) {
+    const buffer = typeof data === 'string' ? Buffer.alloc(83, 0x20) : Buffer.alloc(data.length + 3)
+    buffer[0] = type
+    Buffer.from(data).copy(buffer, 1)
+    buffer[buffer.length - 2] = 0xF8
+    buffer[buffer.length - 1] = 0x01
+    client.write(buffer)
 }
 
 function vortexClient(config) {
@@ -66,7 +74,7 @@ vortexClient.prototype = {
         delete this.data
     },
     connect() {
-        const { host, port, username, password, autoConnect } = this.config
+        const { host, port, username, password } = this.config
         this.start(() => this.client.connect(port, host)) // no callback, as end() is triggered by welcome message
         return this.login(username, password)
     },
@@ -80,18 +88,10 @@ vortexClient.prototype = {
         if (typeof cmd !== 'string' || cmd.length === 0) {
             return Promise.reject('Invalid command')
         }
-        console.log(cmd)
         return this.start(() => {
-            this.send(cmd)
+            console.log(cmd)
+            send(this.client, cmd)
         })
-    },
-    send(cmd) {
-        const buffer = Buffer.alloc(83, 0x20)
-        buffer[0] = REQUEST_TYPES.COMMAND_LINE
-        buffer.write(cmd, 1)
-        buffer[buffer.length - 2] = 0xF8
-        buffer[buffer.length - 1] = 0x01
-        this.client.write(buffer)
     },
     onData(data) {
         data = Array.from(data)
@@ -135,7 +135,7 @@ vortexClient.prototype = {
         }
     },
     getPage(mag, set, page) {
-        let command = new String(mag)
+        let command = String(mag)
         if (set || page) command += ' ' + set
         if (page) command += '.' + page
         return this.sendCommand(command).then(response => {
@@ -155,13 +155,7 @@ vortexClient.prototype = {
                     return Promise.reject(`Unexpected response ${response}`)
                 }
                 return this.start(() => {
-                    data = Buffer.from(data)
-                    const buffer = Buffer.alloc(data.length + 3)
-                    buffer[0] = REQUEST_TYPES.PAGE_RESPONSE
-                    data.copy(buffer, 1)
-                    buffer[buffer.length - 2] = 0xF8
-                    buffer[buffer.length - 1] = 0x01
-                    this.client.write(buffer)
+                    send(this.client, data, REQUEST_TYPES.PAGE_RESPONSE)
                 })
             })
     },

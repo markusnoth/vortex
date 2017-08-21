@@ -36,6 +36,9 @@ app.get('/page/:mag/:set?/:page?', (req, res, next) => {
 
 app.post('/page', multer.single('data'), (req, res, next) => {
     const { command } = req.body
+    if (!(command && req.file)) {
+        return res.sendStatus(400)
+    }
     const data = []
     for (let i = 0; i < 24; i++) {
         data.push(i)
