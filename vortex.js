@@ -36,25 +36,30 @@ function vortexClient(config) {
 
 vortexClient.prototype = {
     client: new net.Socket(),
+    promise: Promise.resolve(),
     start(action) {
-        return new Promise((resolve, reject) => {
-            const result = action()
-            const timeout = setTimeout(() => {
-                reject('Timeout')
-            }, this.config.timeout)
-            Object.assign(this, { resolve, reject, timeout })
-            return result
-        })
+        this.promise = this.promise
+            .then(() => new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject('Timeout')
+                }, this.config.timeout)
+                Object.assign(this, { resolve, reject, timeout })
+                return action()
+            }))
+        return this.promise
     },
     end(result) {
         if (this.timeout) {
             clearTimeout(this.timeout)
         }
-        if (result.error) {
+        if (!(this.resolve && this.reject)) {
+            throw new Error('end() called without pending promise')
+        }
+        if (result && result.error) {
             this.reject(result.error)
         }
         else {
-            this.resolve(result.response || result)
+            this.resolve(result && result.response || result)
         }
         delete this.resolve
         delete this.reject
@@ -62,32 +67,31 @@ vortexClient.prototype = {
     },
     connect() {
         const { host, port, username, password, autoConnect } = this.config
-        return this.start(() => this.client.connect(port, host))
-            .then(() => {
-                if (username && password && autoConnect) {
-                    return this.login(username, password)
-                }
-            })
+        this.start(() => this.client.connect(port, host)) // no callback, as end() is triggered by welcome message
+        return this.login(username, password)
     },
     login(username, password) {
         if (!username) throw new Error('Username is required')
         if (!password) throw new Error('Password is required')
-        return this.send(`log ${username}`).then(response => this.send(password))
+        this.sendCommand(`log ${username}`)
+        return this.sendCommand(password)
     },
-    send(cmd) {
+    sendCommand(cmd) {
         if (typeof cmd !== 'string' || cmd.length === 0) {
             return Promise.reject('Invalid command')
         }
+        console.log(cmd)
         return this.start(() => {
-            return new Promise((resolve, reject) => {
-                const data = Buffer.alloc(83, 0x20)
-                data[0] = REQUEST_TYPES.COMMAND_LINE
-                data.write(cmd, 1)
-                data[81] = 0xF8
-                data[82] = 0x01
-                this.client.write(data, () => resolve(cmd))
-            })
+            this.send(cmd)
         })
+    },
+    send(cmd) {
+        const buffer = Buffer.alloc(83, 0x20)
+        buffer[0] = REQUEST_TYPES.COMMAND_LINE
+        buffer.write(cmd, 1)
+        buffer[buffer.length - 2] = 0xF8
+        buffer[buffer.length - 1] = 0x01
+        this.client.write(buffer)
     },
     onData(data) {
         data = Array.from(data)
@@ -134,7 +138,7 @@ vortexClient.prototype = {
         let command = new String(mag)
         if (set || page) command += ' ' + set
         if (page) command += '.' + page
-        return this.send(command).then(response => {
+        return this.sendCommand(command).then(response => {
             if (response.type === RESPONSE_TYPES.PAGE_WITH_COMMAND_ROW) {
                 const { page, command } = response
                 page.splice(0, 0, 0xFE, 0x01, 0x1A, 0x00, 0x00, 0x00)
@@ -145,7 +149,7 @@ vortexClient.prototype = {
         })
     },
     sendPage(command, data) {
-        return this.send(command)
+        return this.sendCommand(command)
             .then(response => {
                 if (response.type !== RESPONSE_TYPES.PAGE_REQUEST) {
                     return Promise.reject(`Unexpected response ${response}`)
