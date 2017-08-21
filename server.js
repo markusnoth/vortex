@@ -1,4 +1,6 @@
 const express = require('express')
+const bodyParser = require('body-parser')
+const multer = require('multer')()
 const config = require('config')
 
 const VortexClient = require('./vortex')
@@ -27,7 +29,30 @@ client.connect()
                     res.setHeader('Content-Type', 'application/ep1')
                     res.send(Buffer.from(response))
                 })
-                .catch(error => res.status(500).send(error.message || error))
+                .catch(next)
+        })
+
+        app.post('/page', multer.single('data'), (req, res, next) => {
+            const { command } = req.body
+            const data = []
+            for (let i = 0; i < 24; i++) {
+                data.push(i)
+                const startIdx = 6 + i * 40
+                data.push(...req.file.buffer.slice(startIdx, startIdx + 40))
+            }
+            client.sendPage(command, data)
+                .then(response => res.send(response))
+                .catch(next)
+        })
+
+        app.post('/cmd', bodyParser.text(), (req, res, next) => {
+            client.send(req.body)
+                .then(({ response }) => res.send(response))
+                .catch(next)
+        })
+
+        app.use((err, req, res, next) => {
+            res.status(500).send(err.message || err)
         })
 
         app.listen(PORT, () => {
