@@ -8,7 +8,8 @@ const RESPONSE_TYPES = {
     COMMAND_RESPONSE: 1,
     PAGE_REQUEST: 2,
     PAGE_WITH_COMMAND_ROW: 3,
-    USER_ACCESS_RESPONSE: 34
+    USER_ACCESS_RESPONSE: 34,
+    ERROR_RESPONSE: 255
 }
 
 const RESPONSE_STATUS_CODES = {
@@ -103,6 +104,7 @@ vortexClient.prototype = {
             data.splice(-2)
             const type = data.shift()
             switch (type) {
+                case RESPONSE_TYPES.ERROR_RESPONSE:
                 case RESPONSE_TYPES.COMMAND_RESPONSE: {
                     const [status, ...command] = data.slice(data.findIndex(i => i !== 32), 81)
                     const commandText = String.fromCharCode.apply(String, command.filter(i => i >= 0x20)).trim()
