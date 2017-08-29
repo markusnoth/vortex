@@ -1,7 +1,9 @@
 const express = require('express')
 const bodyParser = require('body-parser')
-const multer = require('multer')()
+const multer = require('multer')
 const config = require('config')
+const passport = require('passport')
+const BasicStrategy = require('passport-http').BasicStrategy
 
 const VortexClient = require('./vortex')
 
@@ -14,6 +16,15 @@ client.connect()
 // setup express server
 const PORT = process.env.PORT || 8080
 const app = express()
+app.use(passport.initialize())
+passport.use(new BasicStrategy((username, password, done) => {
+    done(null, { username })
+}))
+const upload = multer()
+
+function authenticate(req, res, next, callback) {
+    return passport.authenticate('basic', { session: false }, callback)(req, res, next)
+}
 
 // setup url-rewriting for iisnode
 if (process.env.VIRTUAL_DIR_PATH) {
@@ -34,25 +45,62 @@ app.get('/page/:mag/:set?/:page?', (req, res, next) => {
         .catch(next)
 })
 
-app.post('/page', multer.single('data'), (req, res, next) => {
-    const { command } = req.body
-    if (!(command && req.file)) {
+app.post('/page/:mag/:set/:page?',
+    authenticate,
+    bodyParser.raw({
+        type: '*/*',
+        verify: (req, res, buffer, encoding) => {
+            if (buffer.length !== 1008) throw new Error('Invalid content size')
+        }
+    }),
+    (req, res, next) => {
+        const { mag, set, page = 1 } = req.params
+        let command = `COIN ${mag} ${set}`
+        if (page) command += `.${page}`
+        return sendPage(req, res, next, command, req.body)
+    }
+)
+app.post('/page',
+    upload.single('data'),
+    authenticate,
+    (req, res, next) => {
+        const { command } = req.body
+        if (!(command && req.file)) {
+            return res.sendStatus(400)
+        }
+        return sendPage(req, res, next, command, req.file.buffer)
+    }
+)
+function sendPage(req, res, next, command, buffer) {
+    const match = command.match(/^([a-z]+) ([0-9]+) ([0-9]+)\.([0-9]+)/i)
+    if(!match) {
         return res.sendStatus(400)
+    }
+    const [_match, cmd, mag, set, page] = match
+    if(!(mag === 18 && set === 70 && page === 1)) {
+        return res.sendStatus(401)
     }
     const data = []
     for (let i = 0; i < 24; i++) {
         data.push(i)
         const startIdx = 6 + i * 40
-        data.push(...req.file.buffer.slice(startIdx, startIdx + 40))
+        data.push(...buffer.slice(startIdx, startIdx + 40))
     }
     client.sendPage(command, data)
         .then(response => res.send(response))
         .catch(next)
-})
+}
 
-app.post('/cmd', bodyParser.text(), (req, res, next) => {
-    client.send(req.body)
-        .then(({ response }) => res.send(response))
+app.post('/cmd', authenticate, bodyParser.text(), (req, res, next) => {
+    client.sendCommand(req.body)
+        .then(result => {
+            let { response, page } = result
+            if (!response && page) {
+                response = String.fromCharCode.apply(String, page)
+            }
+            if (response) return res.send(response)
+            return res.json(result)
+        })
         .catch(next)
 })
 
