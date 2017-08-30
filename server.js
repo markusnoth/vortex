@@ -4,6 +4,7 @@ const multer = require('multer')
 const config = require('config')
 const passport = require('passport')
 const BasicStrategy = require('passport-http').BasicStrategy
+var cors = require('cors')
 
 const VortexClient = require('./vortex')
 
@@ -16,6 +17,9 @@ client.connect()
 // setup express server
 const PORT = process.env.PORT || 8080
 const app = express()
+app.use(cors({
+    methods: 'POST'
+}))
 app.use(passport.initialize())
 passport.use(new BasicStrategy((username, password, done) => {
     done(null, { username })
@@ -77,7 +81,7 @@ function sendPage(req, res, next, command, buffer) {
         return res.sendStatus(400)
     }
     const [_match, cmd, mag, set, page] = match
-    if(!(mag === 18 && set === 70 && page === 1)) {
+    if(!(mag == 18 && set == 70 && page == 1)) {
         return res.sendStatus(401)
     }
     const data = []
